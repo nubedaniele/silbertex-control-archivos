@@ -1,0 +1,688 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Control de Archivos PCP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap">
+<style>
+/* Layout: una columna de trabajo — carga de archivos arriba, veredicto, luego detalle por talle. */
+:root{
+  --bg:#f3f5f5; --surface:#ffffff; --ink:#14282b; --muted:#5b6e71; --line:#d8e0e1;
+  --petrol:#0f3a40; --petrol-ink:#e8f1f2; --accent:#0e6f78;
+  --ok:#1d7a4a; --ok-bg:#e3f3ea; --warn:#9a6200; --warn-bg:#fbf0d9; --bad:#b3261e; --bad-bg:#fbe5e3;
+  --chip:#eef2f3;
+  --f-ui:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-num:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1718; --surface:#142224; --ink:#e3ecec; --muted:#93a7a9; --line:#26393b;
+  --petrol:#0b2d31; --petrol-ink:#d9eaec; --accent:#4fb8c2;
+  --ok:#5fcf91; --ok-bg:#12301f; --warn:#e8b45a; --warn-bg:#33270f; --bad:#ff8a80; --bad-bg:#3a1714;
+  --chip:#1c2e30; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1718; --surface:#142224; --ink:#e3ecec; --muted:#93a7a9; --line:#26393b;
+  --petrol:#0b2d31; --petrol-ink:#d9eaec; --accent:#4fb8c2;
+  --ok:#5fcf91; --ok-bg:#12301f; --warn:#e8b45a; --warn-bg:#33270f; --bad:#ff8a80; --bad-bg:#3a1714;
+  --chip:#1c2e30; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:15px;line-height:1.5}
+.band{background:var(--petrol);color:var(--petrol-ink)}
+.wrap{max-width:980px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header .wrap{padding-block:22px 20px;display:flex;flex-wrap:wrap;gap:6px 18px;align-items:baseline;justify-content:space-between}
+h1{font-family:var(--f-num);font-weight:700;font-size:32px;letter-spacing:.02em;margin:0;text-transform:uppercase;text-wrap:balance}
+header p{margin:0;opacity:.8;font-size:14px}
+main.wrap{padding-block:22px 48px;display:grid;gap:22px}
+.drops{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:640px){.drops{grid-template-columns:1fr}}
+.drop{position:relative;background:var(--surface);border:1.5px dashed var(--line);border-radius:10px;padding:16px 18px;display:grid;gap:4px;cursor:pointer;min-width:0;transition:border-color .15s}
+.drop:hover,.drop.over{border-color:var(--accent)}
+.drop:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.drop input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+.drop .lab{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.drop .name{font-weight:600;overflow-wrap:anywhere}
+.drop .hint{font-size:13px;color:var(--muted)}
+.drop.loaded{border-style:solid}
+.note{font-size:13px;color:var(--muted);margin:-8px 0 0}
+.arts{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 18px;display:grid;gap:10px}
+.arts h2,.sec h2{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0}
+.artlist{display:flex;flex-wrap:wrap;gap:8px}
+.art{display:flex;gap:8px;align-items:flex-start;border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;min-width:0;max-width:100%}
+.art input{margin-top:4px;accent-color:var(--accent)}
+.art b{font-weight:600}
+.art small{display:block;color:var(--muted);font-size:12.5px}
+.verdict{border-radius:10px;padding:18px 20px;display:grid;gap:6px;border:1px solid}
+.verdict.bad{background:var(--bad-bg);border-color:var(--bad);color:var(--ink)}
+.verdict.ok{background:var(--ok-bg);border-color:var(--ok)}
+.verdict.warn{background:var(--warn-bg);border-color:var(--warn)}
+.verdict .tag{font-family:var(--f-num);font-weight:700;font-size:26px;letter-spacing:.03em;text-transform:uppercase;line-height:1.1}
+.verdict.bad .tag{color:var(--bad)} .verdict.ok .tag{color:var(--ok)} .verdict.warn .tag{color:var(--warn)}
+.verdict .meta{font-size:14px;color:var(--muted)}
+.stats{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:14px;font-variant-numeric:tabular-nums}
+.stats b{font-family:var(--f-num);font-size:20px;font-weight:700;margin-right:4px}
+.example{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;background:var(--chip);color:var(--muted);border-radius:4px;padding:2px 8px;margin-bottom:2px;justify-self:start}
+.sec{display:grid;gap:10px}
+.issues{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.issue{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--muted);border-radius:6px;padding:10px 14px;display:grid;gap:2px}
+.issue.bad{border-left-color:var(--bad)} .issue.warn{border-left-color:var(--warn)} .issue.info{border-left-color:var(--accent)}
+.issue .k{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.issue.bad .k{color:var(--bad)} .issue.warn .k{color:var(--warn)} .issue.info .k{color:var(--accent)}
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;min-width:560px;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+th{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+td.t{font-family:var(--f-num);font-weight:700;font-size:20px;width:70px}
+td.q{width:90px;font-size:14px}
+.pill{display:inline-block;font-size:12px;font-weight:600;border-radius:999px;padding:2px 10px;white-space:nowrap}
+.pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.bad{background:var(--bad-bg);color:var(--bad)} .pill.warn{background:var(--warn-bg);color:var(--warn)}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{font-family:var(--f-num);font-weight:700;font-size:16px;min-width:34px;text-align:center;padding:1px 7px;border-radius:5px;background:var(--chip);border:1px solid transparent;line-height:1.5}
+.chip.ok{background:var(--ok-bg);color:var(--ok)}
+.chip.miss{background:transparent;color:var(--bad);border:1.5px dashed var(--bad)}
+.chip.err{background:var(--bad);color:var(--surface)}
+.chip.extra{background:var(--warn-bg);color:var(--warn);border-color:var(--warn)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--muted);align-items:center}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+.legend .chip{font-size:13px;min-width:26px}
+.actions{display:flex;flex-wrap:wrap;gap:10px}
+button{font:inherit;font-weight:600;border-radius:8px;padding:9px 16px;border:1px solid var(--accent);background:var(--accent);color:var(--surface);cursor:pointer}
+button.ghost{background:transparent;color:var(--accent)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+textarea{width:100%;min-height:150px;font:13px/1.5 ui-monospace,Menlo,Consolas,monospace;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px}
+details{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 16px}
+summary{cursor:pointer;font-weight:600}
+details .raw{font:12.5px/1.6 ui-monospace,Menlo,Consolas,monospace;color:var(--muted);overflow-wrap:anywhere;margin-top:8px}
+.err-box{background:var(--bad-bg);border:1px solid var(--bad);border-radius:10px;padding:14px 18px}
+.spin{color:var(--muted);font-size:14px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+
+<header class="band"><div class="wrap">
+  <h1>Control de archivos</h1>
+  <p>Pedido PDF + archivo Corel → errores antes de sublimar</p>
+</div></header>
+
+<main class="wrap">
+  <section class="drops" aria-label="Archivos">
+    <label class="drop" id="dropPdf">
+      <input type="file" id="inPdf" accept="application/pdf,.pdf">
+      <span class="lab">1 · Pedido (PDF)</span>
+      <span class="name" id="namePdf">Elegí o arrastrá el PDF del pedido</span>
+      <span class="hint">El que sale de la planilla de pedidos</span>
+    </label>
+    <label class="drop" id="dropCdr">
+      <input type="file" id="inCdr" accept=".cdr,.zip">
+      <span class="lab">2 · Diseño (CorelDRAW)</span>
+      <span class="name" id="nameCdr">Elegí o arrastrá el .cdr</span>
+      <span class="hint">También sirve la copia de seguridad (.zip)</span>
+    </label>
+  </section>
+  <p class="note">Los archivos se leen en tu navegador. No se suben a ningún lado.</p>
+
+  <div id="status"></div>
+  <section class="arts" id="arts" hidden>
+    <h2>Artículos que están en este archivo</h2>
+    <div class="artlist" id="artlist"></div>
+  </section>
+  <div id="report"></div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script>
+/* Motor de control: pedido (PDF de Google Sheets) vs archivo CorelDRAW (.cdr X4+ = ZIP) */
+(function (G) {
+  const LETTER_TALLES = ['XXS','XS','S','M','L','XL','XXL','2XL','3XL','4XL','5XL','XXXL'];
+  const normTalle = t => {
+    t = String(t).trim().toUpperCase().replace(/\s+/g, '');
+    if (t === 'XXL') return '2XL';
+    if (t === 'XXXL') return '3XL';
+    return t;
+  };
+  const isLetterTalle = t => LETTER_TALLES.includes(String(t).toUpperCase());
+  const isTalleCell = t => /^(\d{1,2}|XXS|XS|S|M|L|XL|XXL|XXXL|[2-5]XL)$/i.test(String(t).trim());
+  const TALLE_ORDER = ['0','2','4','6','8','10','12','14','16','XXS','XS','S','M','L','XL','2XL','3XL','4XL','5XL'];
+  const talleRank = t => { const i = TALLE_ORDER.indexOf(t); return i < 0 ? 99 : i; };
+
+  /* ---------- PDF del pedido ---------- */
+  // items: [{page, x, y (hacia arriba), str, w?}]
+  function mergeItems(items) {
+    const clean = items.filter(i => i.str && i.str.trim() !== '').map(i => ({ ...i, w: i.w ?? i.str.length * 4 }));
+    clean.sort((a, b) => a.page - b.page || b.y - a.y || a.x - b.x);
+    const out = [];
+    for (const it of clean) {
+      const last = out[out.length - 1];
+      if (last && last.page === it.page && Math.abs(last.y - it.y) < 1.5 && it.x - (last.x + last.w) < 4 && it.x >= last.x) {
+        const gap = it.x - (last.x + last.w);
+        last.str += (gap > 0.8 && !last.str.endsWith(' ') ? ' ' : '') + it.str;
+        last.w = it.x + it.w - last.x;
+      } else out.push({ ...it });
+    }
+    out.forEach(i => (i.str = i.str.replace(/\s+/g, ' ').trim()));
+    return out;
+  }
+
+  function parseNumberList(txt) {
+    const body = txt.replace(/^[^:]*:/, '');
+    const res = [];
+    for (let part of body.split('/')) {
+      part = part.trim();
+      if (!part) continue;
+      const m = part.match(/\d{1,3}/);
+      if (!m) continue;
+      res.push({ n: String(parseInt(m[0], 10)), muestra: /muestra|\*/i.test(part) });
+    }
+    return res;
+  }
+
+  function parseOrder(rawItems) {
+    const items = mergeItems(rawItems);
+    const order = { numero: '', cliente: '', entrega: '', articulos: [] };
+    const right = re => {
+      const lab = items.find(i => re.test(i.str));
+      if (!lab) return '';
+      const cand = items.filter(i => i.page === lab.page && Math.abs(i.y - lab.y) < 4 && i.x > lab.x + 5).sort((a, b) => a.x - b.x);
+      return cand[0] ? cand[0].str : '';
+    };
+    order.numero = right(/^N°\s*de\s*Orden/i);
+    order.cliente = right(/^Cliente/i);
+    order.entrega = right(/^Fecha\s*de\s*Entrega/i);
+
+    const pos = it => it.page * 100000 + (10000 - it.y); // orden de lectura
+    const arts = items.filter(i => /^ARTICULO\s*\d+/i.test(i.str)).sort((a, b) => pos(a) - pos(b));
+    arts.forEach((a, k) => {
+      const next = arts[k + 1];
+      const region = items.filter(i => pos(i) >= pos(a) - 6 && (!next || pos(i) < pos(next) - 6));
+      const art = {
+        id: parseInt(a.str.match(/\d+/)[0], 10), descripcion: '', codigo: '', total: null, molde: '',
+        colores: [], tela: '', detalles: '', filas: [], avisos: []
+      };
+      const descParts = region.filter(i => i.page === a.page && Math.abs(i.y - a.y) < 7 && i.x > a.x + 20 && !/CANTIDADES/i.test(i.str));
+      art.descripcion = descParts.sort((p, q) => q.y - p.y || p.x - q.x).map(i => i.str).join(' ').replace(/\s*—\s*$/, '').trim();
+      const cod = art.descripcion.match(/\b[A-Z]{4,6}\d{3}[A-Z]?\b/);
+      if (cod) { art.codigo = cod[0]; art.descripcion = art.descripcion.replace(/\s*—?\s*[A-Z]{4,6}\d{3}[A-Z]?\s*$/, '').replace(/\s*—\s*$/, ''); }
+      const tot = region.find(i => /CANTIDADES\s*TOTALES/i.test(i.str));
+      if (tot) { const m = tot.str.match(/(\d+)\s*$/); if (m) art.total = parseInt(m[1], 10); }
+
+      const hT = region.find(i => /^TALLE$/i.test(i.str));
+      const hC = region.find(i => /^CANTIDAD$/i.test(i.str));
+      const hO = region.find(i => /^OBSERVACIONES$/i.test(i.str));
+      if (hT && hC) {
+        const tCx = hT.x + hT.w / 2, cCx = hC.x + hC.w / 2;
+        const filas = region
+          .filter(i => i.page === hT.page && i.y < hT.y - 2 && isTalleCell(i.str) && Math.abs(i.x + i.w / 2 - tCx) < 22)
+          .map(i => {
+            const q = region.find(j => j.page === i.page && Math.abs(j.y - i.y) < 2.5 && /^\d+$/.test(j.str) && Math.abs(j.x + j.w / 2 - cCx) < 25);
+            return { talle: normTalle(i.str), cantidad: q ? parseInt(q.str, 10) : null, y: i.y, page: i.page, obs: [] };
+          })
+          .filter(f => f.cantidad !== null)
+          .sort((p, q) => q.y - p.y);
+        const obsX = hO ? Math.min(hO.x, (hC.x + hC.w) + 10) : hC.x + hC.w + 10;
+        region
+          .filter(i => i.page === hT.page && i.y < hT.y - 2 && i.x >= obsX - 15 && i.x > hC.x + hC.w)
+          .forEach(o => {
+            let best = null;
+            for (const f of filas) { const d = o.y - f.y; if (d > -2 && d < 16 && (!best || d < best.d)) best = { f, d }; }
+            if (best) best.f.obs.push(o);
+          });
+        for (const f of filas) {
+          const txt = f.obs.sort((p, q) => q.y - p.y || p.x - q.x).map(o => o.str).join(' ');
+          f.observaciones = txt;
+          const mN = txt.match(/N[ÚU]MEROS?\s*:([^]*?)(?=NOMBRES?\s*:|$)/i);
+          f.numeros = mN ? parseNumberList(':' + mN[1]) : [];
+          const mNo = txt.match(/NOMBRES?\s*:([^]*?)(?=N[ÚU]MEROS?\s*:|$)/i);
+          f.nombres = mNo ? mNo[1].split('/').map(s => s.trim()).filter(Boolean) : [];
+          delete f.obs; delete f.y; delete f.page;
+        }
+        art.filas = filas;
+      }
+      const molLab = region.find(i => /^MOLDE$/i.test(i.str));
+      if (molLab) {
+        const m = region.filter(i => i.page === molLab.page && i.y < molLab.y && molLab.y - i.y < 30 && /^[A-Z]{2,4}\d{2,4}[A-Z]?$/.test(i.str)).sort((p, q) => q.y - p.y)[0];
+        if (m) art.molde = m.str;
+      }
+      if (!art.molde) { const m = region.find(i => /^VC[A-Z]\d{3}$/.test(i.str)); if (m) art.molde = m.str; }
+      art.colores = region.map(i => i.str.match(/^Color\s*\d\s*:\s*(.+)$/i)).filter(Boolean).map(m => m[1].trim()).filter(c => !/^NO$/i.test(c));
+      const telaLab = region.find(i => /^Tela$/i.test(i.str));
+      if (telaLab) {
+        art.tela = region.filter(i => i.page === telaLab.page && i.y < telaLab.y && telaLab.y - i.y < 32 && Math.abs(i.x - telaLab.x) < 40 && !/^Color/i.test(i.str) && !isTalleCell(i.str))
+          .sort((p, q) => q.y - p.y).map(i => i.str).join(' ');
+      }
+      const detLab = region.find(i => /^Detalles de venta/i.test(i.str));
+      if (detLab) art.detalles = region.filter(i => i.page === detLab.page && i.y < detLab.y && detLab.y - i.y < 60 && Math.abs(i.x - detLab.x) < 6).sort((p, q) => q.y - p.y).map(i => i.str).join(' · ');
+      order.articulos.push(art);
+    });
+    return order;
+  }
+
+  /* ---------- Avisos del propio pedido ---------- */
+  function checkOrder(order) {
+    const avisos = [];
+    for (const a of order.articulos) {
+      let suma = 0;
+      for (const f of a.filas) {
+        suma += f.cantidad;
+        const cant = f.numeros.length;
+        if (cant && cant !== f.cantidad) avisos.push({ nivel: 'error', art: a.id, talle: f.talle, msg: `El pedido dice ${f.cantidad} unidades pero lista ${cant} números.` });
+        if (!cant) avisos.push({ nivel: 'aviso', art: a.id, talle: f.talle, msg: `Talle sin números cargados.` });
+        const seen = {};
+        f.numeros.forEach(n => (seen[n.n] = (seen[n.n] || 0) + 1));
+        for (const [n, c] of Object.entries(seen)) if (c > 1) avisos.push({ nivel: 'aviso', art: a.id, talle: f.talle, msg: `El número ${n} está ${c} veces en el mismo talle. Confirmar con el vendedor si es correcto.` });
+      }
+      if (a.total != null && suma !== a.total) avisos.push({ nivel: 'error', art: a.id, msg: `La suma por talle da ${suma} y el total del artículo dice ${a.total}.` });
+    }
+    return avisos;
+  }
+
+  /* ---------- CDR (ZIP) ---------- */
+  async function readBytes(blob, start, len) { return new Uint8Array(await blob.slice(start, start + len).arrayBuffer()); }
+  const u16 = (b, o) => b[o] | (b[o + 1] << 8);
+  const u32 = (b, o) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
+  const u64 = (b, o) => u32(b, o) + u32(b, o + 4) * 4294967296;
+
+  async function zipEntries(blob) {
+    const size = blob.size;
+    const head = await readBytes(blob, 0, 4);
+    if (head[0] === 0x52 && head[1] === 0x49 && head[2] === 0x46 && head[3] === 0x46) throw new Error('VIEJO');
+    if (!(head[0] === 0x50 && head[1] === 0x4b)) throw new Error('NOZIP');
+    const tailLen = Math.min(size, 65557);
+    const tail = await readBytes(blob, size - tailLen, tailLen);
+    let e = -1;
+    for (let i = tail.length - 22; i >= 0; i--) if (u32(tail, i) === 0x06054b50) { e = i; break; }
+    if (e < 0) throw new Error('NOZIP');
+    let cdSize = u32(tail, e + 12), cdOff = u32(tail, e + 16), count = u16(tail, e + 10);
+    if (cdOff === 0xffffffff || cdSize === 0xffffffff || count === 0xffff) {
+      const loc = e - 20;
+      if (loc >= 0 && u32(tail, loc) === 0x07064b50) {
+        const z64off = u64(tail, loc + 8);
+        const z = await readBytes(blob, z64off, 56);
+        count = u64(z, 32); cdSize = u64(z, 40); cdOff = u64(z, 48);
+      }
+    }
+    const cd = await readBytes(blob, cdOff, cdSize);
+    const list = [];
+    let p = 0;
+    const dec = new TextDecoder();
+    while (p + 46 <= cd.length && u32(cd, p) === 0x02014b50) {
+      const method = u16(cd, p + 10);
+      let comp = u32(cd, p + 20), unc = u32(cd, p + 24);
+      const nl = u16(cd, p + 28), xl = u16(cd, p + 30), cl = u16(cd, p + 32);
+      let lho = u32(cd, p + 42);
+      const name = dec.decode(cd.subarray(p + 46, p + 46 + nl));
+      let x = p + 46 + nl;
+      const xe = x + xl;
+      while (x + 4 <= xe) {
+        const id = u16(cd, x), sz = u16(cd, x + 2);
+        if (id === 1) {
+          let q = x + 4;
+          if (unc === 0xffffffff) { unc = u64(cd, q); q += 8; }
+          if (comp === 0xffffffff) { comp = u64(cd, q); q += 8; }
+          if (lho === 0xffffffff) { lho = u64(cd, q); q += 8; }
+        }
+        x += 4 + sz;
+      }
+      list.push({ name, method, comp, unc, lho });
+      p = xe + cl;
+    }
+    return list;
+  }
+
+  async function readEntry(blob, ent) {
+    const lh = await readBytes(blob, ent.lho, 30);
+    const start = ent.lho + 30 + u16(lh, 26) + u16(lh, 28);
+    const data = await readBytes(blob, start, ent.comp);
+    if (ent.method === 0) return data;
+    if (ent.method !== 8) throw new Error('Compresión no soportada');
+    const ds = new DecompressionStream('deflate-raw');
+    const buf = await new Response(new Blob([data]).stream().pipeThrough(ds)).arrayBuffer();
+    return new Uint8Array(buf);
+  }
+
+  const decodeXml = s => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16))).replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(+d)).replace(/&amp;/g, '&');
+
+  async function readCdr(blob, fileName) {
+    const ents = await zipEntries(blob);
+    const ti = ents.find(e => /textinfo\.xml$/i.test(e.name));
+    if (!ti) throw new Error('SINTEXTO');
+    const xml = new TextDecoder().decode(await readEntry(blob, ti));
+    const textos = [];
+    const reS = /<TextStream\b[^>]*>([\s\S]*?)<\/TextStream>/g;
+    let m;
+    while ((m = reS.exec(xml))) {
+      const runs = [...m[1].matchAll(/<TextRun\b[^>]*>([\s\S]*?)<\/TextRun>/g)].map(r => decodeXml(r[1]));
+      textos.push(runs.join(' ').replace(/\s+/g, ' ').trim());
+    }
+    const moldes = new Set();
+    (fileName || '').toUpperCase().replace(/[_\s]/g, ' ').match(/\b[A-Z]{3}\d{3}\b/g)?.forEach(x => /^VC/.test(x) && moldes.add(x));
+    textos.forEach(t => (t.toUpperCase().match(/\bVC[A-Z]\d{3}\b/g) || []).forEach(x => moldes.add(x)));
+    return { textos, moldes: [...moldes], entradas: ents.length };
+  }
+
+  /* ---------- Reconocer camisetas en los textos del CDR ---------- */
+  // Cada camiseta = [número, talle] en frente + [número, talle] en espalda (en el orden interno del archivo)
+  function findGarments(textos, expected) {
+    const expTalles = new Set(expected.map(e => e.talle));
+    const expSet = new Set(expected.map(e => e.talle + '|' + e.n));
+    const tok = textos.map(t => t.trim());
+    const isNum = t => /^\d{1,3}$/.test(t);
+    const asNum = t => String(parseInt(t, 10));
+    const talleOf = t => {
+      const u = normTalle(t);
+      if (isLetterTalle(u) || u === '2XL' || u === '3XL' || u === '4XL' || u === '5XL') return u;
+      if (/^\d{1,2}$/.test(u) && expTalles.has(String(parseInt(u, 10)))) return String(parseInt(u, 10));
+      return null;
+    };
+    const N = tok.length;
+    const best = new Array(N + 1).fill(0), choice = new Array(N + 1).fill(null);
+    for (let i = N - 1; i >= 0; i--) {
+      best[i] = best[i + 1] - 1; choice[i] = { k: 'skip', len: 1 };
+      if (i + 3 < N && isNum(tok[i]) && isNum(tok[i + 2])) {
+        const t = talleOf(tok[i + 1]), t2 = talleOf(tok[i + 3]);
+        if (t && t === t2) {
+          const a = asNum(tok[i]), b = asNum(tok[i + 2]);
+          let s;
+          if (a === b) {
+            s = a === t ? (expSet.has(t + '|' + a) ? 15 : -8) : 10 + (expSet.has(t + '|' + a) ? 5 : 0);
+            if (best[i + 4] + s > best[i]) { best[i] = best[i + 4] + s; choice[i] = { k: 'ok', len: 4, talle: t, n: a }; }
+          } else {
+            s = 4;
+            if (a === t || b === t) s = -99; // casi siempre es una etiqueta de talle suelta
+            if (expSet.has(t + '|' + a) || expSet.has(t + '|' + b)) s += 3;
+            if (best[i + 4] + s > best[i]) { best[i] = best[i + 4] + s; choice[i] = { k: 'mix', len: 4, talle: t, a, b }; }
+          }
+        }
+      }
+    }
+    const res = [];
+    for (let i = 0; i < N;) { const c = choice[i]; if (c.k !== 'skip') res.push({ ...c, idx: i }); i += c.len; }
+    return res;
+  }
+
+  /* ---------- Comparación ---------- */
+  function compare(order, articleIds, cdr) {
+    const arts = order.articulos.filter(a => articleIds.includes(a.id));
+    const expected = [];
+    arts.forEach(a => a.filas.forEach(f => f.numeros.forEach(n => expected.push({ art: a.id, talle: f.talle, n: n.n, muestra: n.muestra }))));
+    let garments = findGarments(cdr.textos, expected);
+
+    // Tabla de talles del molde: un mismo número repetido en muchos talles que no están pedidos
+    const byNum = {};
+    garments.forEach(g => { const n = g.k === 'ok' ? g.n : null; if (n) (byNum[n] = byNum[n] || new Set()).add(g.talle); });
+    const plantilla = [];
+    for (const [n, ts] of Object.entries(byNum)) {
+      if (ts.size >= 4) {
+        const fuera = [...ts].filter(t => !expected.some(e => e.talle === t && e.n === n));
+        if (fuera.length >= 3) plantilla.push({ n, talles: [...ts] });
+      }
+    }
+    const plantillaNums = new Set(plantilla.map(p => p.n));
+    garments = garments.filter(g => !(g.k === 'ok' && plantillaNums.has(g.n) && !expected.some(e => e.talle === g.talle && e.n === g.n)));
+
+    // Emparejar
+    const pend = expected.map(e => ({ ...e, ok: false }));
+    const take = (t, n) => { const e = pend.find(x => !x.ok && x.talle === t && x.n === n); if (e) { e.ok = true; return e; } return null; };
+    const errores = [], sobrantes = [], encontrados = [];
+    const capSame = {};
+    for (const g of garments.filter(g => g.k === 'ok')) {
+      if (g.n === g.talle) { const k = g.talle; capSame[k] = (capSame[k] || 0) + 1; }
+      const e = take(g.talle, g.n);
+      if (e) encontrados.push({ talle: g.talle, n: g.n, art: e.art });
+      else if (g.n !== g.talle) sobrantes.push({ talle: g.talle, n: g.n });
+    }
+    for (const g of garments.filter(g => g.k === 'mix' && !plantillaNums.has(g.a) && !plantillaNums.has(g.b))) {
+      let e = take(g.talle, g.a), cubre = g.a, otro = g.b;
+      if (!e) { e = take(g.talle, g.b); cubre = g.b; otro = g.a; }
+      if (e) {
+        errores.push({ tipo: 'frente-espalda', talle: g.talle, n: cubre, otro, art: e.art,
+          msg: `La camiseta ${cubre} tiene un ${otro} en una de sus piezas (frente o espalda).` });
+        encontrados.push({ talle: g.talle, n: cubre, art: e.art, error: true });
+      } else {
+        errores.push({ tipo: 'frente-espalda', talle: g.talle, n: g.a, otro: g.b,
+          msg: `Hay una camiseta con ${g.a} en una pieza y ${g.b} en la otra, y ninguno de los dos números falta en el pedido.` });
+      }
+    }
+    const faltantes = pend.filter(e => !e.ok);
+
+    // Resumen por talle
+    const talles = [...new Set([...expected.map(e => e.talle), ...encontrados.map(e => e.talle), ...sobrantes.map(s => s.talle)])].sort((a, b) => talleRank(a) - talleRank(b));
+    const porTalle = talles.map(t => {
+      const pedido = expected.filter(e => e.talle === t);
+      const enArchivo = encontrados.filter(e => e.talle === t).length + sobrantes.filter(s => s.talle === t).length;
+      return {
+        talle: t,
+        pedido: pedido.length,
+        archivo: enArchivo,
+        faltan: faltantes.filter(f => f.talle === t).map(f => f.n),
+        sobran: sobrantes.filter(s => s.talle === t).map(s => s.n),
+        errores: errores.filter(e => e.talle === t),
+        numerosPedido: pedido.map(p => p.n + (p.muestra ? '*' : '')),
+        arts: [...new Set(pedido.map(p => p.art))]
+      };
+    });
+    const tallesAusentes = porTalle.filter(p => p.pedido > 0 && p.archivo === 0).map(p => p.talle);
+
+    // Moldes
+    const moldesPedido = [...new Set(arts.map(a => a.molde).filter(Boolean))];
+    const moldeOk = !cdr.moldes.length || !moldesPedido.length || moldesPedido.every(m => cdr.moldes.includes(m));
+
+    return {
+      arts, expected, garments, plantilla, errores, faltantes, sobrantes, porTalle, tallesAusentes,
+      moldesPedido, moldesArchivo: cdr.moldes, moldeOk,
+      totalPedido: expected.length, totalArchivo: encontrados.length + sobrantes.length
+    };
+  }
+
+  function suggestArticles(order, cdr) {
+    if (!cdr.moldes.length) return order.articulos.map(a => a.id);
+    const ids = order.articulos.filter(a => cdr.moldes.includes(a.molde)).map(a => a.id);
+    return ids.length ? ids : order.articulos.map(a => a.id);
+  }
+
+  G.Control = { parseOrder, checkOrder, readCdr, findGarments, compare, suggestArticles, mergeItems };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+const SAMPLE = {"pdfName": "Pedido_OC_N_529_-_LUJAN_DE_CUYO_-_Grupo2_1.pdf", "cdrName": "Copia_de_seguridad_de_OC529_-_LUJAN_DE_CUYO_-_VCA030_CAMISETA_DE_JUEGO_PROCESP_cdr.zip", "items": [{"page": 1, "x": 38.3, "y": 794.3, "w": 6.6, "str": "N°"}, {"page": 1, "x": 46.4, "y": 794.3, "w": 6.6, "str": "de"}, {"page": 1, "x": 54.4, "y": 794.3, "w": 17.9, "str": "Orden:"}, {"page": 1, "x": 135.6, "y": 791, "w": 20.6, "str": "529"}, {"page": 1, "x": 179.4, "y": 794.3, "w": 19.5, "str": "Fechad"}, {"page": 1, "x": 200.4, "y": 794.3, "w": 6.6, "str": "de"}, {"page": 1, "x": 208.5, "y": 794.3, "w": 20.5, "str": "Pedido:"}, {"page": 1, "x": 260.1, "y": 794.6, "w": 25.6, "str": "19/8/2026"}, {"page": 1, "x": 38.3, "y": 780.5, "w": 27.6, "str": "Vendedor:"}, {"page": 1, "x": 179.4, "y": 780.5, "w": 16.1, "str": "Fecha"}, {"page": 1, "x": 197.1, "y": 780.5, "w": 6.6, "str": "de"}, {"page": 1, "x": 205.2, "y": 780.5, "w": 22.4, "str": "Entrega:"}, {"page": 1, "x": 260.1, "y": 780.7, "w": 25.6, "str": "2/10/2026"}, {"page": 1, "x": 38.3, "y": 768.5, "w": 20.6, "str": "Cliente:"}, {"page": 1, "x": 125.9, "y": 768.7, "w": 16.8, "str": "LUJAN"}, {"page": 1, "x": 144, "y": 768.7, "w": 6.5, "str": "DE"}, {"page": 1, "x": 151.9, "y": 768.7, "w": 14.1, "str": "CUYO"}, {"page": 1, "x": 179.4, "y": 768.5, "w": 17.2, "str": "Forma"}, {"page": 1, "x": 198.1, "y": 768.5, "w": 6.6, "str": "de"}, {"page": 1, "x": 206.2, "y": 768.5, "w": 15.5, "str": "Pago:"}, {"page": 1, "x": 38.3, "y": 756.5, "w": 12.6, "str": "Cuit:"}, {"page": 1, "x": 179.4, "y": 756.5, "w": 25.3, "str": "Sucursal:"}, {"page": 1, "x": 261.5, "y": 754.2, "w": 4.2, "str": "M"}, {"page": 1, "x": 262.2, "y": 759.8, "w": 1.2, "str": ","}, {"page": 1, "x": 264.6, "y": 759.8, "w": 2.6, "str": "L"}, {"page": 1, "x": 265.7, "y": 754.2, "w": 2.7, "str": "E"}, {"page": 1, "x": 267.1, "y": 759.8, "w": 3.2, "str": "U"}, {"page": 1, "x": 268.4, "y": 754.2, "w": 3.4, "str": "N"}, {"page": 1, "x": 270.2, "y": 759.8, "w": 2.7, "str": "J"}, {"page": 1, "x": 271.8, "y": 754.2, "w": 3.1, "str": "D"}, {"page": 1, "x": 272.9, "y": 759.8, "w": 3.2, "str": "A"}, {"page": 1, "x": 274.9, "y": 754.2, "w": 3.3, "str": "O"}, {"page": 1, "x": 276.1, "y": 759.8, "w": 3.4, "str": "N"}, {"page": 1, "x": 278.2, "y": 754.2, "w": 2.9, "str": "Z"}, {"page": 1, "x": 280.7, "y": 759.8, "w": 3.1, "str": "D"}, {"page": 1, "x": 281.1, "y": 754.2, "w": 3.2, "str": "A"}, {"page": 1, "x": 283.8, "y": 759.8, "w": 2.7, "str": "E"}, {"page": 1, "x": 287.7, "y": 759.8, "w": 13.4, "str": "CUYO,"}, {"page": 1, "x": 402.2, "y": 749, "w": 61.2, "str": "SILBERTEX"}, {"page": 1, "x": 38.3, "y": 744.5, "w": 25.5, "str": "Telefono:"}, {"page": 1, "x": 179.4, "y": 745, "w": 12.2, "str": "Calle:"}, {"page": 1, "x": 38.3, "y": 732.5, "w": 21.5, "str": "Nombre"}, {"page": 1, "x": 61.3, "y": 732.5, "w": 6.6, "str": "de"}, {"page": 1, "x": 69.4, "y": 732.5, "w": 26, "str": "Contacto:"}, {"page": 1, "x": 179.4, "y": 733, "w": 18.5, "str": "Numero:"}, {"page": 1, "x": 38.3, "y": 720.5, "w": 16.6, "str": "Email:"}, {"page": 1, "x": 144.8, "y": 721, "w": 1.9, "str": "-"}, {"page": 1, "x": 179.4, "y": 721, "w": 15.2, "str": "Codigo"}, {"page": 1, "x": 195.9, "y": 721, "w": 15, "str": "Postal:"}, {"page": 1, "x": 38.3, "y": 708.5, "w": 31.3, "str": "Transporte:"}, {"page": 1, "x": 122.7, "y": 709.5, "w": 18.6, "str": "CORREO"}, {"page": 1, "x": 142.5, "y": 709.5, "w": 26.6, "str": "ARGENTINO"}, {"page": 1, "x": 179.4, "y": 709.5, "w": 21.5, "str": "Provincia:"}, {"page": 1, "x": 261.5, "y": 709.5, "w": 22.8, "str": "MENDOZA"}, {"page": 1, "x": 38.3, "y": 695.6, "w": 28.2, "str": "ARTICULO"}, {"page": 1, "x": 68, "y": 695.6, "w": 5.1, "str": "1:"}, {"page": 1, "x": 119.9, "y": 698.9, "w": 23.6, "str": "CAMISETA"}, {"page": 1, "x": 144.7, "y": 698.9, "w": 9.8, "str": "CON"}, {"page": 1, "x": 155.7, "y": 698.9, "w": 12.9, "str": "PUÑO"}, {"page": 1, "x": 169.8, "y": 698.9, "w": 35.6, "str": "ANTIDESGARRO"}, {"page": 1, "x": 206.6, "y": 698.9, "w": 11, "str": "FULL"}, {"page": 1, "x": 218.8, "y": 698.9, "w": 26.9, "str": "SUBLIMADA"}, {"page": 1, "x": 246.9, "y": 698.9, "w": 16.6, "str": "UNISEX"}, {"page": 1, "x": 264.7, "y": 698.9, "w": 1.9, "str": "-"}, {"page": 1, "x": 267.8, "y": 698.9, "w": 24.6, "str": "HANDBALL"}, {"page": 1, "x": 293.6, "y": 698.9, "w": 3.7, "str": "—"}, {"page": 1, "x": 392.5, "y": 694.9, "w": 40, "str": "CANTIDADES"}, {"page": 1, "x": 434, "y": 694.9, "w": 27.8, "str": "TOTALES"}, {"page": 1, "x": 463.4, "y": 694.9, "w": 7.6, "str": "28"}, {"page": 1, "x": 195.6, "y": 693.3, "w": 27.2, "str": "CAUCP010G"}, {"page": 1, "x": 61.4, "y": 682.7, "w": 28.5, "str": "DETALLES"}, {"page": 1, "x": 137, "y": 682.7, "w": 17.6, "str": "TALLE"}, {"page": 1, "x": 194.7, "y": 682.7, "w": 29.4, "str": "CANTIDAD"}, {"page": 1, "x": 375.9, "y": 682.7, "w": 47.9, "str": "OBSERVACIONES"}, {"page": 1, "x": 243.1, "y": 670.7, "w": 36.2, "str": "NÚMEROS:"}, {"page": 1, "x": 281, "y": 670.7, "w": 2.7, "str": "/"}, {"page": 1, "x": 285.5, "y": 670.7, "w": 4.1, "str": "1"}, {"page": 1, "x": 291.4, "y": 670.7, "w": 2.7, "str": "/"}, {"page": 1, "x": 295.8, "y": 670.7, "w": 4.1, "str": "3"}, {"page": 1, "x": 301.7, "y": 670.7, "w": 2.7, "str": "/"}, {"page": 1, "x": 306.2, "y": 670.7, "w": 8.2, "str": "99"}, {"page": 1, "x": 143, "y": 665.3, "w": 5.2, "str": "8"}, {"page": 1, "x": 206.6, "y": 665.3, "w": 5.2, "str": "3"}, {"page": 1, "x": 243.1, "y": 650.9, "w": 36.2, "str": "NÚMEROS:"}, {"page": 1, "x": 281, "y": 650.9, "w": 2.7, "str": "/"}, {"page": 1, "x": 285.5, "y": 650.9, "w": 8.2, "str": "21"}, {"page": 1, "x": 295.5, "y": 650.9, "w": 2.7, "str": "/"}, {"page": 1, "x": 300, "y": 650.9, "w": 4.1, "str": "7"}, {"page": 1, "x": 140.7, "y": 645.5, "w": 10.3, "str": "10"}, {"page": 1, "x": 206.6, "y": 645.5, "w": 5.2, "str": "2"}, {"page": 1, "x": 243.1, "y": 631, "w": 36.2, "str": "NÚMEROS:"}, {"page": 1, "x": 281, "y": 631, "w": 2.7, "str": "/"}, {"page": 1, "x": 285.5, "y": 631, "w": 4.1, "str": "8"}, {"page": 1, "x": 291.4, "y": 631, "w": 2.7, "str": "/"}, {"page": 1, "x": 295.8, "y": 631, "w": 8.2, "str": "18"}, {"page": 1, "x": 305.9, "y": 631, "w": 2.7, "str": "/"}, {"page": 1, "x": 310.3, "y": 631, "w": 8.2, "str": "23"}, {"page": 1, "x": 320.3, "y": 631, "w": 2.7, "str": "/"}, {"page": 1, "x": 324.8, "y": 631, "w": 8.2, "str": "16"}, {"page": 1, "x": 334.8, "y": 631, "w": 2.7, "str": "/"}, {"page": 1, "x": 339.3, "y": 631, "w": 8.2, "str": "15"}, {"page": 1, "x": 349.3, "y": 631, "w": 2.7, "str": "/"}, {"page": 1, "x": 353.8, "y": 631, "w": 8.2, "str": "19"}, {"page": 1, "x": 363.8, "y": 631, "w": 2.7, "str": "/"}, {"page": 1, "x": 368.3, "y": 631, "w": 8.2, "str": "21"}, {"page": 1, "x": 378.3, "y": 631, "w": 2.7, "str": "/"}, {"page": 1, "x": 382.7, "y": 631, "w": 8.2, "str": "33"}, {"page": 1, "x": 140.7, "y": 625.7, "w": 10.3, "str": "12"}, {"page": 1, "x": 206.6, "y": 625.7, "w": 5.2, "str": "8"}, {"page": 1, "x": 243.1, "y": 611.2, "w": 36.2, "str": "NÚMEROS:"}, {"page": 1, "x": 281, "y": 611.2, "w": 2.7, "str": "/"}, {"page": 1, "x": 285.5, "y": 611.2, "w": 4.1, "str": "9"}, {"page": 1, "x": 291.4, "y": 611.2, "w": 2.7, "str": "/"}, {"page": 1, "x": 295.8, "y": 611.2, "w": 8.2, "str": "35"}, {"page": 1, "x": 140.7, "y": 605.9, "w": 10.3, "str": "14"}, {"page": 1, "x": 206.6, "y": 605.9, "w": 5.2, "str": "2"}, {"page": 1, "x": 243.1, "y": 591.4, "w": 36.2, "str": "NÚMEROS:"}, {"page": 1, "x": 281, "y": 591.4, "w": 2.7, "str": "/"}, {"page": 1, "x": 285.5, "y": 591.4, "w": 8.2, "str": "77"}, {"page": 1, "x": 69.7, "y": 587.7, "w": 11.7, "str": "Tela"}, {"page": 1, "x": 140.2, "y": 586, "w": 11.2, "str": "XS"}, {"page": 1, "x": 206.6, "y": 586, "w": 5.2, "str": "1"}, {"page": 1, "x": 60, "y": 573, "w": 13.7, "str": "1090"}, {"page": 1, "x": 75.2, "y": 573, "w": 2.4, "str": "-"}, {"page": 1, "x": 79.1, "y": 573, "w": 10.8, "str": "SET"}, {"page": 1, "x": 243.1, "y": 571.5, "w": 36.2, "str": "NÚMEROS:"}, {"page": 1, "x": 281, "y": 571.5, "w": 2.7, "str": "/"}, {"page": 1, "x": 285.5, "y": 571.5, "w": 4.1, "str": "3"}, {"page": 1, "x": 291.4, "y": 571.5, "w": 2.7, "str": "/"}, {"page": 1, "x": 295.8, "y": 571.5, "w": 8.2, "str": "20"}, {"page": 1, "x": 305.9, "y": 571.5, "w": 2.7, "str": "/"}, {"page": 1, "x": 310.3, "y": 571.5, "w": 4.1, "str": "3"}, {"page": 1, "x": 143, "y": 566.2, "w": 5.5, "str": "S"}, {"page": 1, "x": 206.6, "y": 566.2, "w": 5.2, "str": "3"}, {"page": 1, "x": 52.6, "y": 565.9, "w": 44.5, "str": "ANTIDESGARRO"}, {"page": 1, "x": 57.7, "y": 558.9, "w": 35.3, "str": "(DONNATEX)"}, {"page": 1, "x": 243.1, "y": 551.7, "w": 36.2, "str": "NÚMEROS:"}, {"page": 1, "x": 281, "y": 551.7, "w": 2.7, "str": "/"}, {"page": 1, "x": 285.5, "y": 551.7, "w": 8.2, "str": "29"}, {"page": 1, "x": 295.5, "y": 551.7, "w": 2.7, "str": "/"}, {"page": 1, "x": 300, "y": 551.7, "w": 4.1, "str": "9"}, {"page": 1, "x": 305.9, "y": 551.7, "w": 2.7, "str": "/"}, {"page": 1, "x": 310.3, "y": 551.7, "w": 4.1, "str": "8"}, {"page": 1, "x": 316.2, "y": 551.7, "w": 2.7, "str": "/"}, {"page": 1, "x": 320.7, "y": 551.7, "w": 8.2, "str": "26"}, {"page": 1, "x": 330.7, "y": 551.7, "w": 2.7, "str": "/"}, {"page": 1, "x": 335.2, "y": 551.7, "w": 8.2, "str": "17"}, {"page": 1, "x": 345.2, "y": 551.7, "w": 2.7, "str": "/"}, {"page": 1, "x": 349.6, "y": 551.7, "w": 8.2, "str": "11"}, {"page": 1, "x": 359.7, "y": 551.7, "w": 2.7, "str": "/"}, {"page": 1, "x": 364.1, "y": 551.7, "w": 4.1, "str": "2"}, {"page": 1, "x": 38.3, "y": 548, "w": 14.5, "str": "Color"}, {"page": 1, "x": 54.3, "y": 548, "w": 5.1, "str": "1:"}, {"page": 1, "x": 60.9, "y": 548, "w": 15.4, "str": "ROJO"}, {"page": 1, "x": 141.6, "y": 546.4, "w": 7.9, "str": "M"}, {"page": 1, "x": 206.6, "y": 546.4, "w": 5.2, "str": "7"}, {"page": 1, "x": 243.1, "y": 531.9, "w": 36.2, "str": "NÚMEROS:"}, {"page": 1, "x": 281, "y": 531.9, "w": 2.7, "str": "/"}, {"page": 1, "x": 285.5, "y": 531.9, "w": 8.2, "str": "21"}, {"page": 1, "x": 295.5, "y": 531.9, "w": 2.7, "str": "/"}, {"page": 1, "x": 300, "y": 531.9, "w": 11.5, "str": "44*"}, {"page": 1, "x": 313.3, "y": 531.9, "w": 26.6, "str": "muestra"}, {"page": 1, "x": 38.3, "y": 528.2, "w": 14.5, "str": "Color"}, {"page": 1, "x": 54.3, "y": 528.2, "w": 5.1, "str": "2:"}, {"page": 1, "x": 60.9, "y": 528.2, "w": 19.6, "str": "NEGRO"}, {"page": 1, "x": 140.7, "y": 526.5, "w": 10.6, "str": "XL"}, {"page": 1, "x": 206.6, "y": 526.5, "w": 5.2, "str": "2"}, {"page": 1, "x": 38.3, "y": 508.4, "w": 14.5, "str": "Color"}, {"page": 1, "x": 54.3, "y": 508.4, "w": 5.1, "str": "3:"}, {"page": 1, "x": 60.9, "y": 508.4, "w": 23.4, "str": "BLANCO"}, {"page": 1, "x": 38.3, "y": 488.6, "w": 14.5, "str": "Color"}, {"page": 1, "x": 54.3, "y": 488.6, "w": 5.1, "str": "4:"}, {"page": 1, "x": 60.9, "y": 488.6, "w": 8.4, "str": "NO"}, {"page": 1, "x": 65.5, "y": 468.7, "w": 19.9, "str": "MOLDE"}, {"page": 1, "x": 64.1, "y": 448.9, "w": 22.2, "str": "VCA030"}, {"page": 1, "x": 74.3, "y": 429.1, "w": 2.4, "str": "-"}, {"page": 1, "x": 54.9, "y": 409.2, "w": 15.7, "str": "HOJA"}, {"page": 1, "x": 72.1, "y": 409.2, "w": 7.3, "str": "DE"}, {"page": 1, "x": 80.8, "y": 409.2, "w": 15.2, "str": "RUTA"}, {"page": 1, "x": 38.3, "y": 389.4, "w": 39.8, "str": "SUBLIMACIÓN"}, {"page": 1, "x": 38.3, "y": 369.6, "w": 36.9, "str": "CONFECCIÓN"}, {"page": 1, "x": 38.3, "y": 349.7, "w": 53.8, "str": "PERSONALIZACIÓN"}, {"page": 1, "x": 38.3, "y": 329.9, "w": 24.7, "str": "CALIDAD"}, {"page": 1, "x": 38.3, "y": 274.6, "w": 44.8, "str": "Personalizacion:"}, {"page": 1, "x": 199.3, "y": 274.6, "w": 21.1, "str": "Gráfica:"}, {"page": 1, "x": 307.6, "y": 274.6, "w": 21.8, "str": "Detalles"}, {"page": 1, "x": 331, "y": 274.6, "w": 6.6, "str": "de"}, {"page": 1, "x": 339.1, "y": 274.6, "w": 16.5, "str": "venta:"}, {"page": 1, "x": 38.3, "y": 262.1, "w": 43.1, "str": "Personalizacion"}, {"page": 1, "x": 82.9, "y": 262.1, "w": 5.1, "str": "1:"}, {"page": 1, "x": 115.8, "y": 262.6, "w": 26.6, "str": "SUBLIMADO"}, {"page": 1, "x": 180.4, "y": 261.6, "w": 14.9, "str": "Pieza"}, {"page": 1, "x": 196.8, "y": 261.6, "w": 30.2, "str": "Sublimada:"}, {"page": 1, "x": 243.1, "y": 262.6, "w": 6.7, "str": "NO"}, {"page": 1, "x": 251, "y": 262.6, "w": 16.3, "str": "APLICA"}, {"page": 1, "x": 38.3, "y": 248.3, "w": 43.1, "str": "Personalizacion"}, {"page": 1, "x": 82.9, "y": 248.3, "w": 5.1, "str": "2:"}, {"page": 1, "x": 115.8, "y": 248.8, "w": 6.7, "str": "NO"}, {"page": 1, "x": 180.4, "y": 248.3, "w": 11.5, "str": "Tela"}, {"page": 1, "x": 193.3, "y": 248.3, "w": 3.2, "str": "a"}, {"page": 1, "x": 198, "y": 248.3, "w": 25.9, "str": "Sublimar:"}, {"page": 1, "x": 243.1, "y": 248.8, "w": 6.7, "str": "NO"}, {"page": 1, "x": 251, "y": 248.8, "w": 16.3, "str": "APLICA"}, {"page": 1, "x": 307.2, "y": 244.6, "w": 8.5, "str": "SET"}, {"page": 1, "x": 316.8, "y": 244.6, "w": 35, "str": "ANTIDESGARRO"}, {"page": 1, "x": 307.2, "y": 239, "w": 21.8, "str": "MUESTRA"}, {"page": 1, "x": 330.2, "y": 239, "w": 6.1, "str": "EN"}, {"page": 1, "x": 337.4, "y": 239, "w": 13.7, "str": "TALLE"}, {"page": 1, "x": 352.3, "y": 239, "w": 5, "str": "xL"}, {"page": 1, "x": 358.4, "y": 239, "w": 19.7, "str": "NÚMERO"}, {"page": 1, "x": 379.3, "y": 239, "w": 5.4, "str": "44"}, {"page": 1, "x": 38.3, "y": 234.4, "w": 43.1, "str": "Personalizacion"}, {"page": 1, "x": 82.9, "y": 234.4, "w": 5.1, "str": "3:"}, {"page": 1, "x": 115.8, "y": 234.9, "w": 6.7, "str": "NO"}, {"page": 1, "x": 180.4, "y": 234.4, "w": 13.8, "str": "Paño"}, {"page": 1, "x": 195.6, "y": 234.4, "w": 30.4, "str": "Sublimado:"}, {"page": 1, "x": 38.3, "y": 220.6, "w": 43.1, "str": "Personalizacion"}, {"page": 1, "x": 82.9, "y": 220.6, "w": 5.1, "str": "4:"}, {"page": 1, "x": 115.8, "y": 221.1, "w": 6.7, "str": "NO"}, {"page": 1, "x": 58.1, "y": 207.9, "w": 35, "str": "529-A01-F01"}, {"page": 1, "x": 128.7, "y": 207.7, "w": 34.1, "str": "529-A01-F02"}, {"page": 1, "x": 430.8, "y": 123, "w": 2, "str": "-"}, {"page": 2, "x": 38.3, "y": 796.2, "w": 28.2, "str": "ARTICULO"}, {"page": 2, "x": 68, "y": 796.2, "w": 5.1, "str": "2:"}, {"page": 2, "x": 119.9, "y": 799.4, "w": 23.6, "str": "CAMISETA"}, {"page": 2, "x": 144.7, "y": 799.4, "w": 9.8, "str": "CON"}, {"page": 2, "x": 155.7, "y": 799.4, "w": 12.9, "str": "PUÑO"}, {"page": 2, "x": 169.8, "y": 799.4, "w": 35.6, "str": "ANTIDESGARRO"}, {"page": 2, "x": 206.6, "y": 799.4, "w": 11, "str": "FULL"}, {"page": 2, "x": 218.8, "y": 799.4, "w": 26.9, "str": "SUBLIMADA"}, {"page": 2, "x": 246.9, "y": 799.4, "w": 16.6, "str": "UNISEX"}, {"page": 2, "x": 264.7, "y": 799.4, "w": 1.9, "str": "-"}, {"page": 2, "x": 267.8, "y": 799.4, "w": 24.6, "str": "HANDBALL"}, {"page": 2, "x": 293.6, "y": 799.4, "w": 3.7, "str": "—"}, {"page": 2, "x": 394.4, "y": 795.5, "w": 40, "str": "CANTIDADES"}, {"page": 2, "x": 435.8, "y": 795.5, "w": 27.8, "str": "TOTALES"}, {"page": 2, "x": 465.3, "y": 795.5, "w": 3.8, "str": "3"}, {"page": 2, "x": 195.6, "y": 793.8, "w": 27.2, "str": "CAUCP010G"}, {"page": 2, "x": 61.4, "y": 783.3, "w": 28.5, "str": "DETALLES"}, {"page": 2, "x": 137, "y": 783.3, "w": 17.6, "str": "TALLE"}, {"page": 2, "x": 194.7, "y": 783.3, "w": 29.4, "str": "CANTIDAD"}, {"page": 2, "x": 375.9, "y": 783.3, "w": 47.9, "str": "OBSERVACIONES"}, {"page": 2, "x": 243.1, "y": 771.2, "w": 36.2, "str": "NÚMEROS:"}, {"page": 2, "x": 281, "y": 771.2, "w": 2.7, "str": "/"}, {"page": 2, "x": 285.5, "y": 771.2, "w": 4.1, "str": "3"}, {"page": 2, "x": 143, "y": 765.9, "w": 5.5, "str": "S"}, {"page": 2, "x": 206.6, "y": 765.9, "w": 5.2, "str": "1"}, {"page": 2, "x": 243.1, "y": 751.4, "w": 36.2, "str": "NÚMEROS:"}, {"page": 2, "x": 281, "y": 751.4, "w": 2.7, "str": "/"}, {"page": 2, "x": 285.5, "y": 751.4, "w": 8.2, "str": "12"}, {"page": 2, "x": 295.5, "y": 751.4, "w": 2.7, "str": "/"}, {"page": 2, "x": 300, "y": 751.4, "w": 11.5, "str": "66*"}, {"page": 2, "x": 313.3, "y": 751.4, "w": 33.4, "str": "MUESTRA"}, {"page": 2, "x": 141.6, "y": 746.1, "w": 7.9, "str": "M"}, {"page": 2, "x": 206.6, "y": 746.1, "w": 5.2, "str": "2"}, {"page": 2, "x": 69.7, "y": 688.3, "w": 11.7, "str": "Tela"}, {"page": 2, "x": 60, "y": 673.5, "w": 13.7, "str": "1090"}, {"page": 2, "x": 75.2, "y": 673.5, "w": 2.4, "str": "-"}, {"page": 2, "x": 79.1, "y": 673.5, "w": 10.8, "str": "SET"}, {"page": 2, "x": 52.6, "y": 666.5, "w": 44.5, "str": "ANTIDESGARRO"}, {"page": 2, "x": 57.7, "y": 659.4, "w": 35.3, "str": "(DONNATEX)"}, {"page": 2, "x": 38.3, "y": 648.6, "w": 14.5, "str": "Color"}, {"page": 2, "x": 54.3, "y": 648.6, "w": 5.1, "str": "1:"}, {"page": 2, "x": 60.9, "y": 648.6, "w": 15.4, "str": "ROJO"}, {"page": 2, "x": 38.3, "y": 628.8, "w": 14.5, "str": "Color"}, {"page": 2, "x": 54.3, "y": 628.8, "w": 5.1, "str": "2:"}, {"page": 2, "x": 60.9, "y": 628.8, "w": 23.4, "str": "BLANCO"}, {"page": 2, "x": 38.3, "y": 608.9, "w": 14.5, "str": "Color"}, {"page": 2, "x": 54.3, "y": 608.9, "w": 5.1, "str": "3:"}, {"page": 2, "x": 60.9, "y": 608.9, "w": 8.4, "str": "NO"}, {"page": 2, "x": 38.3, "y": 589.1, "w": 14.5, "str": "Color"}, {"page": 2, "x": 54.3, "y": 589.1, "w": 5.1, "str": "4:"}, {"page": 2, "x": 60.9, "y": 589.1, "w": 8.4, "str": "NO"}, {"page": 2, "x": 65.5, "y": 569.3, "w": 19.9, "str": "MOLDE"}, {"page": 2, "x": 64.1, "y": 549.4, "w": 22.2, "str": "VCA030"}, {"page": 2, "x": 74.3, "y": 529.6, "w": 2.4, "str": "-"}, {"page": 2, "x": 54.9, "y": 509.8, "w": 15.7, "str": "HOJA"}, {"page": 2, "x": 72.1, "y": 509.8, "w": 7.3, "str": "DE"}, {"page": 2, "x": 80.8, "y": 509.8, "w": 15.2, "str": "RUTA"}, {"page": 2, "x": 38.3, "y": 489.9, "w": 39.8, "str": "SUBLIMACIÓN"}, {"page": 2, "x": 38.3, "y": 470.1, "w": 36.9, "str": "CONFECCIÓN"}, {"page": 2, "x": 38.3, "y": 450.3, "w": 53.8, "str": "PERSONALIZACIÓN"}, {"page": 2, "x": 38.3, "y": 430.4, "w": 24.7, "str": "CALIDAD"}, {"page": 2, "x": 38.3, "y": 374.2, "w": 44.8, "str": "Personalizacion:"}, {"page": 2, "x": 198.8, "y": 374.2, "w": 21.1, "str": "Gráfica:"}, {"page": 2, "x": 307.6, "y": 374.2, "w": 21.8, "str": "Detalles"}, {"page": 2, "x": 331, "y": 374.2, "w": 6.6, "str": "de"}, {"page": 2, "x": 339.1, "y": 374.2, "w": 16.5, "str": "venta:"}, {"page": 2, "x": 38.3, "y": 359.9, "w": 43.1, "str": "Personalizacion"}, {"page": 2, "x": 82.9, "y": 359.9, "w": 5.1, "str": "1:"}, {"page": 2, "x": 115.8, "y": 360.1, "w": 29.9, "str": "SUBLIMADO"}, {"page": 2, "x": 180.4, "y": 359.9, "w": 14.9, "str": "Pieza"}, {"page": 2, "x": 196.8, "y": 359.9, "w": 30.2, "str": "Sublimada:"}, {"page": 2, "x": 243.1, "y": 360.8, "w": 6.7, "str": "NO"}, {"page": 2, "x": 251, "y": 360.8, "w": 16.3, "str": "APLICA"}, {"page": 2, "x": 38.3, "y": 346.5, "w": 43.1, "str": "Personalizacion"}, {"page": 2, "x": 82.9, "y": 346.5, "w": 5.1, "str": "2:"}, {"page": 2, "x": 115.8, "y": 346.8, "w": 7.6, "str": "NO"}, {"page": 2, "x": 180.4, "y": 346.5, "w": 11.5, "str": "Tela"}, {"page": 2, "x": 193.3, "y": 346.5, "w": 3.2, "str": "a"}, {"page": 2, "x": 198, "y": 346.5, "w": 25.9, "str": "Sublimar:"}, {"page": 2, "x": 243.1, "y": 347, "w": 6.7, "str": "NO"}, {"page": 2, "x": 251, "y": 347, "w": 16.3, "str": "APLICA"}, {"page": 2, "x": 307.2, "y": 343.1, "w": 9.5, "str": "SET"}, {"page": 2, "x": 318, "y": 343.1, "w": 39.3, "str": "ANTIDESGARRO"}, {"page": 2, "x": 307.2, "y": 336.7, "w": 24.5, "str": "MUESTRA"}, {"page": 2, "x": 333.1, "y": 336.7, "w": 6.9, "str": "EN"}, {"page": 2, "x": 341.2, "y": 336.7, "w": 15.4, "str": "TALLE"}, {"page": 2, "x": 357.9, "y": 336.7, "w": 4.7, "str": "M"}, {"page": 2, "x": 364, "y": 336.7, "w": 22.2, "str": "NÚMERO"}, {"page": 2, "x": 387.5, "y": 336.7, "w": 6.1, "str": "66"}, {"page": 2, "x": 38.3, "y": 332.7, "w": 43.1, "str": "Personalizacion"}, {"page": 2, "x": 82.9, "y": 332.7, "w": 5.1, "str": "3:"}, {"page": 2, "x": 115.8, "y": 332.9, "w": 7.6, "str": "NO"}, {"page": 2, "x": 180.4, "y": 332.7, "w": 13.8, "str": "Paño"}, {"page": 2, "x": 195.6, "y": 332.7, "w": 30.4, "str": "Sublimado:"}, {"page": 2, "x": 38.3, "y": 318.8, "w": 43.1, "str": "Personalizacion"}, {"page": 2, "x": 82.9, "y": 318.8, "w": 5.1, "str": "4:"}, {"page": 2, "x": 115.8, "y": 319.1, "w": 7.6, "str": "NO"}, {"page": 2, "x": 58.1, "y": 306.1, "w": 35, "str": "529-A02-F01"}, {"page": 2, "x": 128.7, "y": 305.9, "w": 34.1, "str": "529-A02-F02"}, {"page": 3, "x": 38.3, "y": 796.2, "w": 28.2, "str": "ARTICULO"}, {"page": 3, "x": 68, "y": 796.2, "w": 5.1, "str": "3:"}, {"page": 3, "x": 128.2, "y": 796.7, "w": 23.6, "str": "CAMISETA"}, {"page": 3, "x": 153, "y": 796.7, "w": 21.8, "str": "ARQUERO"}, {"page": 3, "x": 176, "y": 796.7, "w": 17.3, "str": "MANGA"}, {"page": 3, "x": 194.5, "y": 796.7, "w": 15.4, "str": "LARGA"}, {"page": 3, "x": 211.1, "y": 796.7, "w": 16.6, "str": "UNISEX"}, {"page": 3, "x": 229, "y": 796.7, "w": 1.9, "str": "-"}, {"page": 3, "x": 232, "y": 796.7, "w": 24.6, "str": "HANDBALL"}, {"page": 3, "x": 257.8, "y": 796.7, "w": 3.7, "str": "—"}, {"page": 3, "x": 262.7, "y": 796.7, "w": 27.7, "str": "CAUML002A"}, {"page": 3, "x": 394.4, "y": 795.5, "w": 40, "str": "CANTIDADES"}, {"page": 3, "x": 435.8, "y": 795.5, "w": 27.8, "str": "TOTALES"}, {"page": 3, "x": 465.3, "y": 795.5, "w": 3.8, "str": "2"}, {"page": 3, "x": 61.4, "y": 783.3, "w": 28.5, "str": "DETALLES"}, {"page": 3, "x": 137, "y": 783.3, "w": 17.6, "str": "TALLE"}, {"page": 3, "x": 194.7, "y": 783.3, "w": 29.4, "str": "CANTIDAD"}, {"page": 3, "x": 375.9, "y": 783.3, "w": 47.9, "str": "OBSERVACIONES"}, {"page": 3, "x": 243.1, "y": 771.2, "w": 36.2, "str": "NÚMEROS:"}, {"page": 3, "x": 281, "y": 771.2, "w": 2.7, "str": "/"}, {"page": 3, "x": 285.5, "y": 771.2, "w": 4.1, "str": "1"}, {"page": 3, "x": 291.4, "y": 771.2, "w": 2.7, "str": "/"}, {"page": 3, "x": 295.8, "y": 771.2, "w": 11.5, "str": "77*"}, {"page": 3, "x": 309.1, "y": 771.2, "w": 33.4, "str": "MUESTRA"}, {"page": 3, "x": 140.2, "y": 765.9, "w": 11.2, "str": "XS"}, {"page": 3, "x": 206.6, "y": 765.9, "w": 5.2, "str": "2"}, {"page": 3, "x": 69.7, "y": 688.3, "w": 11.7, "str": "Tela"}, {"page": 3, "x": 43.4, "y": 672.1, "w": 13.7, "str": "1002"}, {"page": 3, "x": 58.6, "y": 672.1, "w": 2.4, "str": "-"}, {"page": 3, "x": 62.5, "y": 672.1, "w": 10.8, "str": "SET"}, {"page": 3, "x": 74.6, "y": 672.1, "w": 31.8, "str": "MICROFIBA"}, {"page": 3, "x": 57.7, "y": 665.1, "w": 35.3, "str": "(DONNATEX)"}, {"page": 3, "x": 38.3, "y": 648.6, "w": 14.5, "str": "Color"}, {"page": 3, "x": 54.3, "y": 648.6, "w": 5.1, "str": "1:"}, {"page": 3, "x": 60.9, "y": 648.6, "w": 15.4, "str": "ROJO"}, {"page": 3, "x": 38.3, "y": 628.8, "w": 14.5, "str": "Color"}, {"page": 3, "x": 54.3, "y": 628.8, "w": 5.1, "str": "2:"}, {"page": 3, "x": 60.9, "y": 628.8, "w": 23.4, "str": "BLANCO"}, {"page": 3, "x": 38.3, "y": 608.9, "w": 14.5, "str": "Color"}, {"page": 3, "x": 54.3, "y": 608.9, "w": 5.1, "str": "3:"}, {"page": 3, "x": 60.9, "y": 608.9, "w": 8.4, "str": "NO"}, {"page": 3, "x": 38.3, "y": 589.1, "w": 14.5, "str": "Color"}, {"page": 3, "x": 54.3, "y": 589.1, "w": 5.1, "str": "4:"}, {"page": 3, "x": 60.9, "y": 589.1, "w": 8.4, "str": "NO"}, {"page": 3, "x": 65.5, "y": 569.3, "w": 19.9, "str": "MOLDE"}, {"page": 3, "x": 64.1, "y": 549.4, "w": 22.2, "str": "VCA034"}, {"page": 3, "x": 74.3, "y": 529.6, "w": 2.4, "str": "-"}, {"page": 3, "x": 54.9, "y": 509.8, "w": 15.7, "str": "HOJA"}, {"page": 3, "x": 72.1, "y": 509.8, "w": 7.3, "str": "DE"}, {"page": 3, "x": 80.8, "y": 509.8, "w": 15.2, "str": "RUTA"}, {"page": 3, "x": 38.3, "y": 489.9, "w": 39.8, "str": "SUBLIMACIÓN"}, {"page": 3, "x": 38.3, "y": 470.1, "w": 36.9, "str": "CONFECCIÓN"}, {"page": 3, "x": 38.3, "y": 450.3, "w": 53.8, "str": "PERSONALIZACIÓN"}, {"page": 3, "x": 38.3, "y": 430.4, "w": 24.7, "str": "CALIDAD"}, {"page": 3, "x": 38.3, "y": 374.2, "w": 44.8, "str": "Personalizacion:"}, {"page": 3, "x": 198.8, "y": 374.2, "w": 21.1, "str": "Gráfica:"}, {"page": 3, "x": 307.6, "y": 374.2, "w": 21.8, "str": "Detalles"}, {"page": 3, "x": 331, "y": 374.2, "w": 6.6, "str": "de"}, {"page": 3, "x": 339.1, "y": 374.2, "w": 16.5, "str": "venta:"}, {"page": 3, "x": 38.3, "y": 359.9, "w": 43.1, "str": "Personalizacion"}, {"page": 3, "x": 82.9, "y": 359.9, "w": 5.1, "str": "1:"}, {"page": 3, "x": 115.8, "y": 360.1, "w": 29.9, "str": "SUBLIMADO"}, {"page": 3, "x": 180.4, "y": 359.9, "w": 14.9, "str": "Pieza"}, {"page": 3, "x": 196.8, "y": 359.9, "w": 30.2, "str": "Sublimada:"}, {"page": 3, "x": 243.1, "y": 360.8, "w": 10.9, "str": "FULL"}, {"page": 3, "x": 255.2, "y": 360.8, "w": 26.6, "str": "SUBLIMADO"}, {"page": 3, "x": 38.3, "y": 346.5, "w": 43.1, "str": "Personalizacion"}, {"page": 3, "x": 82.9, "y": 346.5, "w": 5.1, "str": "2:"}, {"page": 3, "x": 115.8, "y": 346.8, "w": 7.6, "str": "NO"}, {"page": 3, "x": 180.4, "y": 346.5, "w": 11.5, "str": "Tela"}, {"page": 3, "x": 193.3, "y": 346.5, "w": 3.2, "str": "a"}, {"page": 3, "x": 198, "y": 346.5, "w": 25.9, "str": "Sublimar:"}, {"page": 3, "x": 243.1, "y": 349.8, "w": 10.8, "str": "1002"}, {"page": 3, "x": 255.1, "y": 349.8, "w": 1.3, "str": "-"}, {"page": 3, "x": 257.6, "y": 349.8, "w": 8.5, "str": "SET"}, {"page": 3, "x": 267.1, "y": 349.8, "w": 24.9, "str": "MICROFIBA"}, {"page": 3, "x": 243.1, "y": 344.1, "w": 28, "str": "(DONNATEX)"}, {"page": 3, "x": 307.2, "y": 339.6, "w": 12.1, "str": "UNA"}, {"page": 3, "x": 320.8, "y": 339.6, "w": 27.3, "str": "MUESTRA"}, {"page": 3, "x": 349.4, "y": 339.6, "w": 17.1, "str": "TALLE"}, {"page": 3, "x": 368, "y": 339.6, "w": 7.3, "str": "XS"}, {"page": 3, "x": 376.8, "y": 339.6, "w": 24.6, "str": "NÚMERO"}, {"page": 3, "x": 402.9, "y": 339.6, "w": 6.7, "str": "77"}, {"page": 3, "x": 38.3, "y": 332.7, "w": 43.1, "str": "Personalizacion"}, {"page": 3, "x": 82.9, "y": 332.7, "w": 5.1, "str": "3:"}, {"page": 3, "x": 115.8, "y": 332.9, "w": 7.6, "str": "NO"}, {"page": 3, "x": 180.4, "y": 332.7, "w": 13.8, "str": "Paño"}, {"page": 3, "x": 195.6, "y": 332.7, "w": 30.4, "str": "Sublimado:"}, {"page": 3, "x": 243.1, "y": 335.9, "w": 12.5, "str": "PAÑO"}, {"page": 3, "x": 256.8, "y": 335.9, "w": 11.9, "str": "PARA"}, {"page": 3, "x": 269.9, "y": 335.9, "w": 18, "str": "CUELLO,"}, {"page": 3, "x": 243.1, "y": 330.3, "w": 21.1, "str": "LIMPIEZA"}, {"page": 3, "x": 265.4, "y": 330.3, "w": 2.9, "str": "Y"}, {"page": 3, "x": 269.5, "y": 330.3, "w": 15.7, "str": "PUÑOS"}, {"page": 3, "x": 38.3, "y": 318.8, "w": 43.1, "str": "Personalizacion"}, {"page": 3, "x": 82.9, "y": 318.8, "w": 5.1, "str": "4:"}, {"page": 3, "x": 115.8, "y": 319.1, "w": 7.6, "str": "NO"}, {"page": 3, "x": 58.1, "y": 306.1, "w": 35, "str": "529-A03-F01"}, {"page": 3, "x": 128.7, "y": 305.9, "w": 34.1, "str": "529-A03-F02"}], "cdr": {"textos": ["M", "M", "20", "S", "20", "S", "S", "S", "3", "S", "3", "S", "S", "S", "3", "S", "3", "S", "S", "S", "M", "M", "M", "M", "M", "M", "11", "M", "11", "M", "M", "2", "M", "2", "M", "M", "17", "M", "17", "M", "M", "26", "M", "26", "M", "M", "9", "M", "9", "M", "M", "8", "M", "8", "M", "M", "29", "M", "29", "M", "M", "M", "S", "4692", "66", "M", "66", "M", "M", "12", "M", "12", "M", "M", "M", "S", "3", "S", "3", "S", "S", "12", "XS", "77", "XS", "77", "XS", "33", "12", "33", "12", "21", "12", "21", "12", "XS", "XS", "12", "12", "12", "12", "12", "12", "12", "12", "12", "12", "12", "12", "12", "12", "12", "12", "18", "12", "8", "12", "8", "12", "8", "12", "23", "12", "23", "12", "16", "12", "16", "12", "15", "12", "15", "12", "19", "12", "19", "12", "24", "14", "24", "14", "24", "12", "24", "12", "24", "10", "24", "24", "8", "24", "8", "24", "6", "24", "6", "24", "4", "24", "4", "24", "2", "24", "2", "24", "0", "24", "24", "24", "14", "14", "14", "VCA030 CAMISETA BASICA CON PUÑO - TALLE 12", "12", "12", "12", "VCA030 CAMISETA BASICA CON PUÑO - TALLE 12", "10", "10", "10", "10", "VCA030 CAMISETA BASICA CON PUÑO - TALLE 10", "8", "8", "8", "VCA030 CAMISETA BASICA CON PUÑO - TALLE 8", "6", "6", "6", "VCA030 CAMISETA BASICA CON PUÑO - TALLE 6", "4", "4", "4", "VCA030 CAMISETA BASICA CON PUÑO - TALLE 4", "2", "2", "2", "VCA030 CAMISETA BASICA CON PUÑO - TALLE 2", "0", "0", "0", "VCA030 CAMISETA BASICA CON PUÑO - TALLE 0", "0", "24", "24", "24", "24", "24", "2XL", "24", "2XL", "24", "XL", "24", "XL", "24", "L", "24", "L", "24", "XS", "24", "XS", "24", "S", "24", "S", "24", "M", "24", "M", "24", "3XL", "24", "3XL", "3XL", "3XL", "3XL", "VCA030 CAMISETA BASICA CON PUÑO - TALLE 2XL", "2XL", "2XL", "2XL", "VCA030 CAMISETA BASICA CON PUÑO - TALLE 2XL", "XL", "XL", "XL", "VCA030 CAMISETA BASICA CON PUÑO - TALLE XL", "L", "L", "L", "VCA030 CAMISETA BASICA CON PUÑO - TALLE M", "M", "M", "M", "VCA030 CAMISETA BASICA CON PUÑO - TALLE M", "S", "S", "VCA030 CAMISETA BASICA CON PUÑO - TALLE S", "S", "XS", "XS", "VCA030 CAMISETA BASICA CON PUÑO - TALLE XS", "XS", "VCA030 CAMISETA BASICA CON PUÑO", "24", "24"], "moldes": ["VCA030"], "entradas": 24}};
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const state = { order: null, cdr: null, pdfName: '', cdrName: '', ids: [], example: true };
+
+if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+async function pdfItems(file) {
+  const doc = await pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const items = [];
+  for (let p = 1; p <= doc.numPages; p++) {
+    const page = await doc.getPage(p);
+    const tc = await page.getTextContent();
+    for (const it of tc.items) if (it.str && it.str.trim()) items.push({ page: p, x: it.transform[4], y: it.transform[5], w: it.width, str: it.str });
+  }
+  return items;
+}
+
+function setStatus(html) { $('status').innerHTML = html; }
+
+async function onPdf(file) {
+  if (!file) return;
+  $('namePdf').textContent = file.name; $('dropPdf').classList.add('loaded');
+  setStatus('<p class="spin">Leyendo pedido…</p>');
+  try {
+    if (!window.pdfjsLib) throw new Error('No se pudo cargar el lector de PDF. Revisá la conexión y recargá la página.');
+    const order = Control.parseOrder(await pdfItems(file));
+    if (!order.articulos.length) throw new Error('No encontré artículos en el PDF. ¿Es el PDF de la planilla de pedidos?');
+    if (state.example) { state.cdr = null; state.cdrName = ''; $('nameCdr').textContent = 'Elegí o arrastrá el .cdr'; $('dropCdr').classList.remove('loaded'); }
+    state.example = false; state.order = order; state.pdfName = file.name;
+    setStatus(''); refresh(true);
+  } catch (e) { setStatus(`<div class="err-box">${esc(e.message)}</div>`); }
+}
+
+async function onCdr(file) {
+  if (!file) return;
+  $('nameCdr').textContent = file.name; $('dropCdr').classList.add('loaded');
+  setStatus('<p class="spin">Leyendo archivo de Corel…</p>');
+  try {
+    const cdr = await Control.readCdr(file, file.name);
+    if (state.example) { state.order = null; state.pdfName = ''; $('namePdf').textContent = 'Elegí o arrastrá el PDF del pedido'; $('dropPdf').classList.remove('loaded'); }
+    state.example = false; state.cdr = cdr; state.cdrName = file.name;
+    setStatus(''); refresh(true);
+  } catch (e) {
+    const msg = { VIEJO: 'Este .cdr es de una versión vieja de Corel (X3 o anterior) y no se puede leer. Guardalo en una versión más nueva.',
+      NOZIP: 'Este archivo no parece un .cdr de Corel. Probá con el .cdr original o con la copia de seguridad.',
+      SINTEXTO: 'El archivo no tiene textos legibles. Si los números están convertidos a curvas, hace falta una captura del armado.' }[e.message] || ('No se pudo leer el archivo: ' + e.message);
+    setStatus(`<div class="err-box">${esc(msg)}</div>`);
+  }
+}
+
+for (const [inp, drop, fn] of [['inPdf','dropPdf',onPdf],['inCdr','dropCdr',onCdr]]) {
+  $(inp).addEventListener('change', e => fn(e.target.files[0]));
+  const d = $(drop);
+  d.addEventListener('dragover', e => { e.preventDefault(); d.classList.add('over'); });
+  d.addEventListener('dragleave', () => d.classList.remove('over'));
+  d.addEventListener('drop', e => { e.preventDefault(); d.classList.remove('over'); fn(e.dataTransfer.files[0]); });
+}
+
+function renderArts() {
+  const o = state.order;
+  $('arts').hidden = !(o && state.cdr);
+  if (!o || !state.cdr) return;
+  $('artlist').innerHTML = o.articulos.map(a => `
+    <label class="art"><input type="checkbox" id="art-${a.id}" data-id="${a.id}" ${state.ids.includes(a.id) ? 'checked' : ''} ${state.example ? 'disabled' : ''}>
+      <span><b>Art. ${a.id} · ${esc(a.molde || 'sin molde')}</b><small>${a.total ?? '?'} u. · ${esc(a.colores.join(' / ') || '—')}</small></span></label>`).join('');
+  $('artlist').querySelectorAll('input').forEach(i => i.addEventListener('change', () => {
+    state.ids = [...$('artlist').querySelectorAll('input:checked')].map(x => +x.dataset.id);
+    renderReport();
+  }));
+}
+
+function refresh(resetIds) {
+  if (state.order && state.cdr && resetIds) state.ids = Control.suggestArticles(state.order, state.cdr);
+  renderArts(); renderReport();
+}
+
+const fmtList = arr => arr.join(', ');
+const tl = t => /^\d/.test(t) ? 'T' + t : t;
+
+function renderReport() {
+  const o = state.order, c = state.cdr;
+  if (!o || !c) {
+    $('report').innerHTML = o || c ? `<p class="spin">Falta ${o ? 'el archivo de Corel' : 'el PDF del pedido'} para hacer el control.</p>` : '';
+    return;
+  }
+  if (!state.ids.length) { $('report').innerHTML = '<p class="spin">Marcá al menos un artículo.</p>'; return; }
+  const r = Control.compare(o, state.ids, c);
+  const avisosPedido = Control.checkOrder(o).filter(a => state.ids.includes(a.art));
+  const nErr = r.errores.length, nFalt = r.faltantes.length, nSob = r.sobrantes.length;
+  const nAvisoPed = avisosPedido.length, nErrPed = avisosPedido.filter(a => a.nivel === 'error').length;
+  const bloqueante = nErr + nFalt + nSob + nErrPed + (r.moldeOk ? 0 : 1);
+  const cls = bloqueante ? 'bad' : (nAvisoPed ? 'warn' : 'ok');
+  const tag = bloqueante ? 'No liberar a sublimación' : (nAvisoPed ? 'Archivo OK · revisar avisos' : 'Archivo OK');
+  const partes = [];
+  if (nErr) partes.push(`${nErr} ${nErr === 1 ? 'camiseta con error' : 'camisetas con error'}`);
+  if (nFalt) partes.push(`${nFalt} ${nFalt === 1 ? 'camiseta falta' : 'camisetas faltan'} en el archivo`);
+  if (nSob) partes.push(`${nSob} ${nSob === 1 ? 'camiseta sobra' : 'camisetas sobran'}`);
+  if (!r.moldeOk) partes.push('el molde no coincide');
+  if (nAvisoPed) partes.push(`${nAvisoPed} ${nAvisoPed === 1 ? 'aviso' : 'avisos'} del pedido`);
+
+  // Problemas
+  const issues = [];
+  if (!r.moldeOk) issues.push({ c: 'bad', k: 'Molde', m: `El pedido usa ${fmtList(r.moldesPedido)} y el archivo es ${fmtList(r.moldesArchivo)}.` });
+  r.errores.forEach(e => issues.push({ c: 'bad', k: `Talle ${e.talle} · frente/espalda`, m: e.msg + ' Abrí esa camiseta en Corel y corregí el número.' }));
+  if (r.tallesAusentes.length) {
+    const det = r.tallesAusentes.map(t => { const p = r.porTalle.find(x => x.talle === t); return `${tl(t)} (${p.faltan.join(', ')})`; });
+    issues.push({ c: 'bad', k: 'Talles completos que faltan', m: `No encontré ninguna camiseta de: ${det.join(' · ')}. Si están en otro archivo, desmarcá ese artículo o ignorá este punto. Si los números están en curvas, hace falta una captura para controlarlos.` });
+  }
+  r.porTalle.filter(p => p.faltan.length && !r.tallesAusentes.includes(p.talle)).forEach(p => {
+    const sinError = p.faltan;
+    issues.push({ c: 'bad', k: `Talle ${p.talle} · faltan`, m: `Faltan los números ${fmtList(sinError)}.` });
+  });
+  r.porTalle.filter(p => p.sobran.length).forEach(p => issues.push({ c: 'bad', k: `Talle ${p.talle} · sobran`, m: `Están en el archivo pero no en el pedido: ${fmtList(p.sobran)}.` }));
+  avisosPedido.forEach(a => issues.push({ c: a.nivel === 'error' ? 'bad' : 'warn', k: `Pedido · Art. ${a.art}${a.talle ? ' · talle ' + a.talle : ''}`, m: a.msg }));
+  if (r.plantilla.length) issues.push({ c: 'info', k: 'Ignorado', m: `Tabla de talles del molde (número ${r.plantilla.map(p => p.n).join(', ')} en ${r.plantilla[0].talles.length} talles). No se cuenta como producción.` });
+
+  const muestras = [];
+  r.arts.forEach(a => a.filas.forEach(f => f.numeros.filter(n => n.muestra).forEach(n => muestras.push(`${tl(f.talle)} N° ${n.n}`))));
+
+  const rows = r.porTalle.map(p => {
+    const errNums = p.errores.map(e => e.n);
+    const restantesOk = {};
+    // chips: números del pedido en orden, marcando estado
+    const faltan = [...p.faltan];
+    const errs = [...errNums];
+    const chips = p.numerosPedido.map(raw => {
+      const n = raw.replace('*', '');
+      const mu = raw.endsWith('*') ? '*' : '';
+      let k = 'ok';
+      const fi = faltan.indexOf(n), ei = errs.indexOf(n);
+      if (fi >= 0) { k = 'miss'; faltan.splice(fi, 1); }
+      else if (ei >= 0) { k = 'err'; errs.splice(ei, 1); }
+      return `<span class="chip ${k}" title="${k === 'miss' ? 'Falta en el archivo' : k === 'err' ? 'Error frente/espalda' : 'OK'}">${esc(n)}${mu}</span>`;
+    }).concat(p.sobran.map(n => `<span class="chip extra" title="Sobra">${esc(n)}</span>`)).join('');
+    const bad = p.faltan.length || p.sobran.length || p.errores.length;
+    const pill = !bad ? '<span class="pill ok">OK</span>' : p.archivo === 0 ? '<span class="pill bad">No está</span>' : '<span class="pill bad">Revisar</span>';
+    return `<tr><td class="t">${esc(p.talle)}</td><td class="q">${p.pedido} / ${p.archivo}</td><td>${pill}</td><td><div class="chips">${chips}</div></td></tr>`;
+  }).join('');
+
+  const head = state.example ? '<span class="example">Ejemplo con la OC 529 · cargá tus archivos arriba</span>' : '';
+  $('report').innerHTML = `
+    <section class="verdict ${cls}" aria-live="polite">
+      ${head}
+      <div class="tag">${tag}</div>
+      <div>${partes.length ? esc(partes.join(' · ')) : 'Todo lo que pide el pedido está en el archivo, con frente y espalda coincidentes.'}</div>
+      <div class="meta">OC ${esc(o.numero)} · ${esc(o.cliente)} · entrega ${esc(o.entrega)} · Art. ${state.ids.join(', ')} · molde ${esc(fmtList(r.moldesArchivo) || '—')}</div>
+      <div class="stats"><span><b>${r.totalPedido}</b>en el pedido</span><span><b>${r.totalArchivo}</b>en el archivo</span><span><b>${nErr}</b>con error</span><span><b>${nFalt}</b>faltan</span></div>
+    </section>
+    ${issues.length ? `<section class="sec"><h2>Qué revisar</h2><ul class="issues">${issues.map(i => `<li class="issue ${i.c}"><span class="k">${esc(i.k)}</span><span>${esc(i.m)}</span></li>`).join('')}</ul></section>` : ''}
+    <section class="sec"><h2>Por talle</h2>
+      <div class="legend"><span><span class="chip ok">8</span>está bien</span><span><span class="chip err">18</span>frente ≠ espalda</span><span><span class="chip miss">7</span>falta</span><span><span class="chip extra">5</span>sobra</span><span>* muestra</span></div>
+      <div class="tablewrap"><table><thead><tr><th>Talle</th><th>Pedido / archivo</th><th>Estado</th><th>Números</th></tr></thead><tbody>${rows}</tbody></table></div>
+    </section>
+    <section class="sec"><h2>No lo controla el archivo</h2>
+      <ul class="issues"><li class="issue info"><span class="k">Con captura</span><span>Colores (${esc([...new Set(r.arts.flatMap(a => a.colores))].join(' / ') || '—')}), que el diseño coincida con el mockup, logos y escudo, y si el número está en el frente o en la espalda.${muestras.length ? ' Muestras a separar: ' + esc(muestras.join(', ')) + '.' : ''}</span></li></ul>
+    </section>
+    <section class="sec"><h2>Mensaje para diseño</h2>
+      <textarea id="msg" readonly>${esc(buildMessage(o, r, avisosPedido))}</textarea>
+      <div class="actions"><button id="copy" type="button">Copiar mensaje</button></div>
+    </section>
+    <details><summary>Lo que leyó del archivo (${c.textos.length} textos, ${r.garments.length} camisetas reconocidas)</summary>
+      <div class="raw">${r.garments.map(g => g.k === 'ok' ? `${esc(g.n)}/${esc(tl(g.talle))}` : `<b>[${esc(g.a)}≠${esc(g.b)}]/${esc(tl(g.talle))}</b>`).join(' · ')}</div>
+      <div class="raw">Textos: ${esc(c.textos.join(' ; '))}</div>
+    </details>`;
+  $('copy').addEventListener('click', async () => {
+    const t = $('msg');
+    try { await navigator.clipboard.writeText(t.value); $('copy').textContent = 'Copiado'; }
+    catch { t.focus(); t.select(); $('copy').textContent = 'Seleccionado, copiá con Ctrl+C'; }
+    setTimeout(() => { const b = $('copy'); if (b) b.textContent = 'Copiar mensaje'; }, 2200);
+  });
+}
+
+function buildMessage(o, r, avisos) {
+  const L = [`Control OC ${o.numero} · ${o.cliente} · Art. ${state.ids.join(', ')} · molde ${r.moldesArchivo.join(', ') || '—'}`];
+  if (!r.moldeOk) L.push(`ERROR molde: pedido ${r.moldesPedido.join(', ')} / archivo ${r.moldesArchivo.join(', ')}`);
+  r.errores.forEach(e => L.push(`ERROR ${tl(e.talle)}: ${e.msg}`));
+  const falt = r.porTalle.filter(p => p.faltan.length).map(p => `${tl(p.talle)}: ${p.faltan.join(', ')}`);
+  if (falt.length) L.push(`FALTAN: ${falt.join(' · ')}`);
+  const sob = r.porTalle.filter(p => p.sobran.length).map(p => `${tl(p.talle)}: ${p.sobran.join(', ')}`);
+  if (sob.length) L.push(`SOBRAN: ${sob.join(' · ')}`);
+  avisos.forEach(a => L.push(`${a.nivel === 'error' ? 'ERROR' : 'AVISO'} pedido Art. ${a.art}${a.talle ? ' ' + tl(a.talle) : ''}: ${a.msg}`));
+  if (L.length === 1) L.push('OK: el archivo coincide con el pedido.');
+  return L.join('\n');
+}
+
+// Arranque con el ejemplo de la OC 529
+state.order = Control.parseOrder(SAMPLE.items);
+state.cdr = SAMPLE.cdr;
+$('namePdf').textContent = 'Ejemplo: ' + SAMPLE.pdfName;
+$('nameCdr').textContent = 'Ejemplo: ' + SAMPLE.cdrName;
+refresh(true);
+</script>
+
+</body>
+</html>
